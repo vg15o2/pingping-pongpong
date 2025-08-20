@@ -1,6 +1,9 @@
 // Canvas and context
 const canvas = document.getElementById('pongCanvas');
 const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const overlayMessage = document.getElementById('overlayMessage');
+const playAgainBtn = document.getElementById('playAgainBtn');
 
 // Game constants
 const PADDLE_WIDTH = 12;
@@ -11,12 +14,118 @@ const PLAYER_COLOR = '#2ecc40';
 const AI_COLOR = '#ff4136';
 const BALL_COLOR = '#ffe066';
 const LINE_COLOR = '#fff';
+const WIN_SCORE = 5;
+const PLAYER_SPEED = 7;
+const SPEED_BOOST_MULTIPLIER = 2;
+
+// Fullscreen / resize helpers
+let defaultCanvasWidth = canvas.width;
+let defaultCanvasHeight = canvas.height;
+
+function resizeCanvas(newWidth, newHeight) {
+	const previousWidth = canvas.width;
+	const previousHeight = canvas.height;
+
+	// Update the canvas internal resolution for crisp rendering
+	canvas.width = Math.max(200, Math.floor(newWidth));
+	canvas.height = Math.max(200, Math.floor(newHeight));
+
+	// Scale positions proportionally to preserve relative placement
+	const scaleX = canvas.width / previousWidth;
+	const scaleY = canvas.height / previousHeight;
+	playerY *= scaleY;
+	aiY *= scaleY;
+	ball.x *= scaleX;
+	ball.y *= scaleY;
+
+	// Clamp paddles within bounds after resize
+	if (playerY < 0) playerY = 0;
+	if (playerY > canvas.height - PADDLE_HEIGHT) playerY = canvas.height - PADDLE_HEIGHT;
+	if (aiY < 0) aiY = 0;
+	if (aiY > canvas.height - PADDLE_HEIGHT) aiY = canvas.height - PADDLE_HEIGHT;
+}
+
+function enterFullscreen() {
+	if (!document.fullscreenElement) {
+		canvas.requestFullscreen().catch(() => {});
+	}
+}
+
+function exitFullscreen() {
+	if (document.fullscreenElement) {
+		document.exitFullscreen().catch(() => {});
+	}
+}
+
+function toggleFullscreen() {
+	if (document.fullscreenElement) {
+		exitFullscreen();
+	} else {
+		enterFullscreen();
+	}
+}
+
+// Adjust canvas when entering/leaving fullscreen or when the window resizes in fullscreen
+document.addEventListener('fullscreenchange', function() {
+	if (document.fullscreenElement === canvas) {
+		resizeCanvas(window.innerWidth, window.innerHeight);
+	} else {
+		resizeCanvas(defaultCanvasWidth, defaultCanvasHeight);
+	}
+});
+
+window.addEventListener('resize', function() {
+	if (document.fullscreenElement === canvas) {
+		resizeCanvas(window.innerWidth, window.innerHeight);
+	}
+});
+
+// Keyboard: F to toggle fullscreen
+document.addEventListener('keydown', function(e) {
+	if (e.key === 'f' || e.key === 'F') {
+		toggleFullscreen();
+	} else if (e.key === 'Control') {
+		ctrlPressed = true;
+		e.preventDefault();
+	} else if (e.key === 'ArrowUp') {
+		upPressed = true;
+		e.preventDefault();
+	} else if (e.key === 'ArrowDown') {
+		downPressed = true;
+		e.preventDefault();
+	}
+});
+
+// Arrow key release handling
+document.addEventListener('keyup', function(e) {
+	if (e.key === 'Control') {
+		ctrlPressed = false;
+		e.preventDefault();
+	}
+	if (e.key === 'ArrowUp') {
+		upPressed = false;
+		e.preventDefault();
+	} else if (e.key === 'ArrowDown') {
+		downPressed = false;
+		e.preventDefault();
+	}
+});
+
+// Double-click canvas to toggle fullscreen
+canvas.addEventListener('dblclick', function() {
+	toggleFullscreen();
+});
 
 // Game state
 let playerY = (canvas.height - PADDLE_HEIGHT) / 2;
 let aiY = (canvas.height - PADDLE_HEIGHT) / 2;
 let playerScore = 0;
 let aiScore = 0;
+let upPressed = false;
+let downPressed = false;
+let ctrlPressed = false;
+let isRunning = true;
+let animationId = null;
 
 // Ball
 let ball = {
@@ -84,6 +193,20 @@ function moveAI() {
         aiY = canvas.height - PADDLE_HEIGHT;
 }
 
+// Player paddle movement via arrow keys
+function movePlayer() {
+    const speed = ctrlPressed ? PLAYER_SPEED * SPEED_BOOST_MULTIPLIER : PLAYER_SPEED;
+    if (upPressed) {
+        playerY -= speed;
+    }
+    if (downPressed) {
+        playerY += speed;
+    }
+    if (playerY < 0) playerY = 0;
+    if (playerY > canvas.height - PADDLE_HEIGHT)
+        playerY = canvas.height - PADDLE_HEIGHT;
+}
+
 // Ball movement and collision
 function moveBall() {
     ball.x += ball.vx;
@@ -124,10 +247,18 @@ function moveBall() {
     // Scoring
     if (ball.x < 0) {
         aiScore++;
+        if (aiScore >= WIN_SCORE) {
+            endGame('You lose!');
+            return;
+        }
         resetBall();
     }
     if (ball.x > canvas.width) {
         playerScore++;
+        if (playerScore >= WIN_SCORE) {
+            endGame('You win!');
+            return;
+        }
         resetBall();
     }
 }
@@ -140,13 +271,46 @@ function resetBall() {
     ball.vy = 4 * (Math.random() > 0.5 ? 1 : -1);
 }
 
+// End game and show overlay
+function endGame(message) {
+    isRunning = false;
+    if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+    overlayMessage.textContent = message;
+    overlay.style.display = 'flex';
+    if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
+// Restart game state
+function restartGame() {
+    playerScore = 0;
+    aiScore = 0;
+    playerY = (canvas.height - PADDLE_HEIGHT) / 2;
+    aiY = (canvas.height - PADDLE_HEIGHT) / 2;
+    resetBall();
+    overlay.style.display = 'none';
+    isRunning = true;
+    animationId = requestAnimationFrame(gameLoop);
+}
+
 // Main loop
 function gameLoop() {
+    if (!isRunning) return;
+    movePlayer();
     moveAI();
     moveBall();
     draw();
-    requestAnimationFrame(gameLoop);
+    animationId = requestAnimationFrame(gameLoop);
 }
 
 // Start the game
 gameLoop();
+
+// Play again button
+playAgainBtn.addEventListener('click', function() {
+    restartGame();
+});
