@@ -17,3 +17,45 @@ h1 {
     border-radius: 8px;
     box-shadow: 0 0 20px #000;
 }
+
+/* Edge-to-edge when fullscreen */
+#pongCanvas:fullscreen {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Game over overlay */
+#overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+#overlay .message {
+    background: #1e1e1e;
+    border: 2px solid #fff;
+    border-radius: 10px;
+    padding: 24px 28px;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+#overlay h2 {
+    margin: 0 0 16px 0;
+}
+#playAgainBtn {
+    background: #2ecc40;
+    color: #000;
+    border: none;
+    padding: 10px 16px;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+}
+#playAgainBtn:hover {
+    background: #25b237;
+}
